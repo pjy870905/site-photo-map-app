@@ -208,21 +208,21 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
     position: absolute;
     width: 60px;
     height: 60px;
-    border: 2px solid #fff;
+    border: 2px solid #ffcc00; /* 초점 링을 눈에 띄는 노란색으로 변경 */
     border-radius: 50%;
     transform: translate(-50%, -50%);
     box-sizing: border-box;
     display: none;
     z-index: 10002;
     pointer-events: none; /* 클릭 이벤트 통과 */
-    box-shadow: 0 0 4px rgba(0,0,0,0.5);
-    animation: focusAnimation 0.5s ease-out;
+    box-shadow: 0 0 4px rgba(0,0,0,0.5), inset 0 0 4px rgba(0,0,0,0.5); /* 안팎으로 그림자 */
+    animation: focusAnimation 0.5s ease-out forwards;
 }
 
 @keyframes focusAnimation {
     0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
     50% { opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
 }
 
 /* 카메라 버튼 오른쪽 중단 배치 */
@@ -258,7 +258,7 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
     transform: scale(0.95);
 }
 
-/* 모달 공통 (설정 및 상세정보) */
+/* 모달 공통 (설정, 상세정보, 수정 등) */
 .modal-overlay {
   display: none; 
   position: fixed; 
@@ -451,7 +451,7 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
           <th>구분3</th>
           <th>구분4</th>
           <th>Page</th>
-          <th>삭제</th>
+          <th>수정/삭제</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -527,6 +527,35 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
   </div>
 </div>
 
+<!-- 기존 마커 정보 수정 모달 -->
+<div id="editInfoModal" class="modal-overlay" style="z-index: 10006;">
+  <div class="modal-content">
+    <h3 style="margin-top:0; color:#333;">마커 정보 수정</h3>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div>
+        <label style="font-size:12px; font-weight:bold;">구분 1</label>
+        <select id="editDiv1"></select>
+      </div>
+      <div>
+        <label style="font-size:12px; font-weight:bold;">구분 2</label>
+        <select id="editDiv2"></select>
+      </div>
+      <div>
+        <label style="font-size:12px; font-weight:bold;">구분 3</label>
+        <select id="editDiv3"></select>
+      </div>
+      <div>
+        <label style="font-size:12px; font-weight:bold;">구분 4</label>
+        <input type="text" id="editDiv4" inputmode="text" placeholder="내용을 입력하세요" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button onclick="closeEditInfo()" style="flex:1; background:#ccc; padding:10px; border:none; border-radius:5px; font-weight:bold;">취소</button>
+      <button onclick="saveEditInfo()" style="flex:1; background:#007bff; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold;">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 설정 모달 -->
 <div id="settingsModal" class="modal-overlay">
   <div class="modal-content">
@@ -547,8 +576,9 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
     <div id="viewedPhotoInfo" style="font-size: 13px; line-height: 1.5; margin-bottom: 15px;"></div>
     
     <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button onclick="startMarkerMove()" style="flex:1; background: #ff8c00; color: white; padding: 12px; border: none; border-radius: 5px; font-weight: bold;">마커 이동하기</button>
-        <button onclick="closePhotoView()" style="flex:1; background: #fff; color: #333; padding: 12px; border: none; border-radius: 5px; font-weight: bold;">닫기</button>
+        <button onclick="startMarkerMove()" style="flex:1; background: #ff8c00; color: white; padding: 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 12px;">이동하기</button>
+        <button onclick="openEditInfoFromView()" style="flex:1; background: #17a2b8; color: white; padding: 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 12px;">내용 수정</button>
+        <button onclick="closePhotoView()" style="flex:1; background: #fff; color: #333; padding: 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 12px;">닫기</button>
     </div>
   </div>
 </div>
@@ -656,10 +686,11 @@ let initialPinchDistance = null;
 // 순차 입력 모달 변수
 let currentInfoStep = 1;
 
-// 마커 이동 모드 변수
+// 마커 이동 및 수정 모드 변수
 let isMoveMode = false;
 let originalMarkerPos = {x: 0, y: 0};
 let currentViewingMarker = null;
+let editingMarker = null;
 
 // ZIP 불러오기 시 임시 저장 변수
 let pendingImportedOptions = null;
@@ -844,7 +875,7 @@ const defaultOptions = {
 let dropdownOptions = JSON.parse(localStorage.getItem("photoAppOptions")) || defaultOptions;
 
 function initDropdowns() {
-    // 순차입력에서는 모달이 열릴 때 동적으로 생성되므로 빈 함수 유지
+    // 순차입력 및 수정 모달에서는 동적으로 생성되므로 빈 함수 유지
 }
 
 function openSettings() {
@@ -1009,17 +1040,14 @@ function updateZoomDisplay() {
 }
 
 // --- 터치 투 포커스 (Touch-to-Focus) 로직 ---
-function applyFocus(clientX, clientY) {
+async function applyFocus(clientX, clientY) {
     if (!activeStream || isFocusing) return;
 
+    // 시각적 포커스 링 즉시 표시
+    showFocusRing(clientX, clientY);
+    isFocusing = true;
+
     const track = activeStream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities();
-    
-    // 지원하지 않으면 링 애니메이션만 보여줌
-    if (!capabilities.focusMode || !capabilities.focusMode.includes('continuous')) {
-        showFocusRing(clientX, clientY);
-        return;
-    }
 
     try {
         const rect = videoWrapper.getBoundingClientRect();
@@ -1063,25 +1091,19 @@ function applyFocus(clientX, clientY) {
         const normalizedX = targetX / videoW;
         const normalizedY = targetY / videoH;
 
-        isFocusing = true;
-        showFocusRing(clientX, clientY);
-
-        track.applyConstraints({
+        // 기기 및 브라우저 지원 여부와 무관하게 제약 조건(Constraints) 강제 시도
+        await track.applyConstraints({
             advanced: [{
-                focusMode: "continuous",
                 pointsOfInterest: [{ x: normalizedX, y: normalizedY }]
             }]
-        }).catch(err => {
-            console.warn("포커스 설정 적용 실패:", err);
-        }).finally(() => {
-            // 잠깐의 딜레이 후 포커스 락 해제
-            setTimeout(() => { isFocusing = false; }, 1000);
         });
 
     } catch(err) {
-        console.warn("포커스 계산 중 오류:", err);
-        showFocusRing(clientX, clientY);
-        isFocusing = false;
+        // 하드웨어 렌즈나 브라우저가 수동 포커스를 미지원할 경우 무시 (링 애니메이션은 유지)
+        console.warn("포커스 제어 미지원 기기:", err);
+    } finally {
+        // 잠깐의 딜레이 후 포커스 락 해제
+        setTimeout(() => { isFocusing = false; }, 1000);
     }
 }
 
@@ -1098,19 +1120,19 @@ function showFocusRing(x, y) {
 
     // 애니메이션 리셋을 위한 트릭
     focusRing.style.animation = 'none';
-    focusRing.offsetHeight; /* trigger reflow */
-    focusRing.style.animation = null; 
+    void focusRing.offsetWidth; /* trigger reflow */
+    focusRing.style.animation = 'focusAnimation 0.5s ease-out forwards'; 
 
-    // 애니메이션 종료 후 숨김
+    // 애니메이션 종료 후 숨김 (1초)
     setTimeout(() => {
         focusRing.style.display = 'none';
-    }, 500);
+    }, 1000);
 }
 
-// 뷰파인더 클릭 시 포커스
-videoWrapper.addEventListener('click', (e) => {
+// 뷰파인더 터치 시 포커스 (모바일 터치 딜레이 해소를 위해 pointerdown 사용)
+videoWrapper.addEventListener('pointerdown', (e) => {
     // 확대/축소 등 멀티터치 상황이 아닐 때만 작동
-    if (initialPinchDistance === null) {
+    if (initialPinchDistance === null && e.isPrimary) {
         applyFocus(e.clientX, e.clientY);
     }
 });
@@ -1333,6 +1355,62 @@ function saveMarkerInfo() {
 function cancelMarkerInfo() {
     pendingMarkerData = null;
     document.getElementById("infoModal").style.display = "none";
+}
+
+// --- 마커 정보 수정 로직 ---
+function populateEditSelect(selectId, options, currentValue) {
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = `<option value="-">선택 안 함</option>`; 
+    options.forEach(opt => {
+        const optionEl = document.createElement("option");
+        optionEl.value = opt;
+        optionEl.innerText = opt;
+        if (opt === currentValue) optionEl.selected = true;
+        sel.appendChild(optionEl);
+    });
+    if(currentValue === "-") sel.value = "-";
+}
+
+function openEditInfo(number) {
+    editingMarker = markers.find(m => m.number === number);
+    if (!editingMarker) return;
+
+    populateEditSelect("editDiv1", dropdownOptions[1], editingMarker.d1);
+    populateEditSelect("editDiv2", dropdownOptions[2], editingMarker.d2);
+    populateEditSelect("editDiv3", dropdownOptions[3], editingMarker.d3);
+    document.getElementById("editDiv4").value = editingMarker.d4 === "-" ? "" : editingMarker.d4;
+
+    document.getElementById("editInfoModal").style.display = "block";
+}
+
+function openEditInfoFromView() {
+    if (currentViewingMarker) {
+        openEditInfo(currentViewingMarker.number);
+    }
+}
+
+function closeEditInfo() {
+    document.getElementById("editInfoModal").style.display = "none";
+    editingMarker = null;
+}
+
+function saveEditInfo() {
+    if (!editingMarker) return;
+
+    editingMarker.d1 = document.getElementById("editDiv1").value;
+    editingMarker.d2 = document.getElementById("editDiv2").value;
+    editingMarker.d3 = document.getElementById("editDiv3").value;
+    editingMarker.d4 = document.getElementById("editDiv4").value || "-";
+
+    renderTable();
+    saveState();
+
+    // 팝업이 열려있는 상태라면 내용 업데이트
+    if (currentViewingMarker && currentViewingMarker.number === editingMarker.number) {
+        document.getElementById("viewedPhotoInfo").innerHTML = `<strong>마커 번호:</strong> ${editingMarker.number} <br> <strong>분류:</strong> ${editingMarker.d1} / ${editingMarker.d2} / ${editingMarker.d3} / ${editingMarker.d4}`;
+    }
+
+    closeEditInfo();
 }
 
 // --- 마커 클릭 시 팝업 및 이동 처리 ---
@@ -1765,7 +1843,11 @@ function renderTable(){
   tableBody.innerHTML="";
   markers.forEach(m=>{
     const row=document.createElement("tr");
-    row.innerHTML=`<td>${m.number}</td><td>${m.d1}</td><td>${m.d2}</td><td>${m.d3}</td><td>${m.d4}</td><td>${m.page}</td><td><button onclick='deleteMarker(${m.number})' style='color:red;'>X</button></td>`;
+    row.innerHTML=`<td>${m.number}</td><td>${m.d1}</td><td>${m.d2}</td><td>${m.d3}</td><td>${m.d4}</td><td>${m.page}</td>
+    <td>
+        <button onclick='openEditInfo(${m.number})' style='color:#007bff; margin-right:10px; font-weight:bold;'>수정</button>
+        <button onclick='deleteMarker(${m.number})' style='color:red; font-weight:bold;'>X</button>
+    </td>`;
     tableBody.appendChild(row);
   });
 }
