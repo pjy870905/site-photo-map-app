@@ -532,7 +532,10 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
   <div class="modal-content">
     <h3 style="margin-top:0; color:#333;">드롭다운 옵션 설정</h3>
     <div id="settingsList"></div>
-    <button class="close-btn" onclick="closeSettings()" style="margin-top: 15px;">닫기</button>
+    <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button class="close-btn" onclick="resetSettings()" style="flex: 1; background: #dc3545;">초기화</button>
+        <button class="close-btn" onclick="closeSettings()" style="flex: 1;">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -834,9 +837,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 // --- 드롭다운 관리 (LocalStorage) ---
 const defaultOptions = {
-    1: ["구조", "마감", "설비", "전기"],
-    2: ["A구역", "B구역", "C구역", "외부"],
-    3: ["양호", "보수필요", "긴급", "재시공"]
+    1: ["B2", "B1", "1F", "2F", "3F", "4F"],
+    2: ["구조체균열", "비구조체균열", "콘크리트노후화", "철근노출", "누수", "기타"],
+    3: ["기측수직균", "보측수직균", "보측사선균", "조벽수직균", "보하균누흔백", "천슬하콘박철노"]
 };
 let dropdownOptions = JSON.parse(localStorage.getItem("photoAppOptions")) || defaultOptions;
 
@@ -913,6 +916,15 @@ function removeOption(idx, val) {
         dropdownOptions[idx] = dropdownOptions[idx].filter(item => item !== val);
         localStorage.setItem("photoAppOptions", JSON.stringify(dropdownOptions));
         openSettings();
+    });
+}
+
+function resetSettings() {
+    customConfirm("드롭다운 옵션을 기본값으로 초기화하시겠습니까?", () => {
+        // 기본 옵션으로 깊은 복사(Deep Copy)하여 복구
+        dropdownOptions = JSON.parse(JSON.stringify(defaultOptions));
+        localStorage.setItem("photoAppOptions", JSON.stringify(dropdownOptions));
+        openSettings(); // 설정 모달 UI 새로고침
     });
 }
 
