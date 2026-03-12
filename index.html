@@ -118,29 +118,30 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
   font-size:11px;
   width:500px;
   max-width: 90%;
+  max-height: 250px; /* 전체 컨테이너 높이 제한 */
+  overflow: auto; /* 상하좌우 스크롤 가능하게 설정 */
   z-index: 10;
   display: none; 
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   touch-action: auto; /* 터치 스크롤 허용 */
 }
 
-#photoTable table{ border-collapse:collapse; width:100%; }
-#photoTable thead{ background:#eee; }
-#photoTable tbody{
-  display:block;
-  max-height:150px;
-  overflow-y:auto;
-  touch-action: auto;
+#photoTable table{ 
+  border-collapse:collapse; 
+  min-width:100%; 
+  width:max-content; 
 }
-#photoTable thead, #photoTable tbody tr{
-  display:table;
-  width:100%;
-  table-layout:fixed;
+#photoTable thead th { 
+  background:#eee; 
+  position: sticky; 
+  top: 0; 
+  z-index: 2; /* 아래로 스크롤 시 헤더가 상단에 고정되게 함 */
 }
-#photoTable th,#photoTable td{
+#photoTable th, #photoTable td{
   border:1px solid #ccc;
   padding:4px 6px;
   text-align:center;
+  white-space: nowrap; /* 텍스트 줄바꿈 방지, 가로로 늘어나게 함 */
 }
 /* 상태표 버튼 스타일 최소화 */
 #photoTable button.action-btn {
@@ -370,7 +371,7 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
 .btn-add { background-color: #28a745; color: white; }
 .btn-ignore { background-color: #6c757d; color: white; }
 
-/* 커스텀 Confirm 모달 (전체화면 해제 방지용) */
+/* 커스텀 Confirm / Alert 모달 (전체화면 해제 방지용) */
 #customConfirmModal {
   display: none;
   position: fixed;
@@ -387,6 +388,7 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
   color: #333;
   margin-bottom: 20px;
   line-height: 1.4;
+  white-space: pre-wrap;
 }
 .confirm-btn-group {
   display: flex;
@@ -632,13 +634,16 @@ body { margin:0; font-family:sans-serif; overflow:hidden; touch-action: none; he
   </div>
 </div>
 
-<!-- 커스텀 알림(Confirm) 모달 -->
+<!-- 커스텀 알림(Confirm/Alert) 모달 -->
 <div id="customConfirmModal" class="modal-overlay">
   <div class="modal-content">
     <div id="customConfirmMessage">메시지</div>
-    <div class="confirm-btn-group">
+    <div class="confirm-btn-group" id="confirmBtnGroup">
         <button class="btn-confirm-yes" onclick="executeConfirm(true)">예</button>
         <button class="btn-confirm-no" onclick="executeConfirm(false)">아니오</button>
+    </div>
+    <div class="alert-btn-group" id="alertBtnGroup" style="display:none; gap:10px;">
+        <button onclick="document.getElementById('customConfirmModal').style.display='none'" style="flex:1; background:#007bff; color:white; padding:12px; border:none; border-radius:5px; font-weight:bold; font-size:14px;">확인</button>
     </div>
   </div>
 </div>
@@ -821,10 +826,19 @@ function closeMenu() {
 }
 
 
-// --- 커스텀 Confirm (전체화면 해제 방지) ---
+// --- 커스텀 Confirm & Alert (전체화면 해제 방지) ---
 function customConfirm(message, callback) {
     document.getElementById("customConfirmMessage").innerText = message;
+    document.getElementById("confirmBtnGroup").style.display = "flex";
+    document.getElementById("alertBtnGroup").style.display = "none";
     confirmCallback = callback;
+    customConfirmModal.style.display = "block";
+}
+
+function customAlert(message) {
+    document.getElementById("customConfirmMessage").innerText = message;
+    document.getElementById("confirmBtnGroup").style.display = "none";
+    document.getElementById("alertBtnGroup").style.display = "flex";
     customConfirmModal.style.display = "block";
 }
 
@@ -981,6 +995,12 @@ function addOption(idx) {
 }
 
 function removeOption(idx, val) {
+    // 구분1, 구분2의 옵션 삭제 시, 이미 마커가 있으면 방지 (CODE 무결성 보호)
+    if ((idx === 1 || idx === 2) && markers.length > 0) {
+        customAlert("이미 촬영된 사진(마커)이 존재하여 구분1, 구분2의 옵션을 삭제할 수 없습니다.\n(옵션 목록 삭제 시 데이터의 CODE 부여 규칙이 틀어질 수 있습니다. 삭제를 원하시면 맵의 모든 데이터를 삭제/초기화 해주세요.)");
+        return;
+    }
+    
     customConfirm(`'${val}' 항목을 삭제하시겠습니까?`, () => {
         dropdownOptions[idx] = dropdownOptions[idx].filter(item => item !== val);
         localStorage.setItem("photoAppOptions", JSON.stringify(dropdownOptions));
@@ -1252,7 +1272,6 @@ function capturePhoto(){
   
   // 용량 최적화 (0.8 화질)
   pendingMarkerData.photoData = canvas.toDataURL("image/jpeg", 0.8);
-  pendingMarkerData.photoName = "photo_"+pendingMarkerData.number+".jpg";
   
   closeCamera(false);
   openInfoWizard(); // 촬영 완료 후 순차 입력 마법사 열기
@@ -1399,6 +1418,12 @@ function assignCodeToMarker(marker) {
 
     // 하이픈(-) 제거 및 2자리 순번 결합 (예: B1-101)
     marker.code = `${marker.d1}-${d2IndexStr}${sequenceStr}`;
+    
+    // 사진 파일 이름에 생성된 CODE 반영
+    if (marker.photoData) {
+        marker.photoName = marker.code + ".jpg";
+    }
+
     codeCounters[key]++;
 }
 
@@ -1419,7 +1444,7 @@ function saveMarkerInfo() {
     // 마지막 4단계 텍스트 입력값 저장
     pendingMarkerData.d4 = inpDiv4.value;
     
-    // CODE 할당
+    // CODE 및 사진 파일명 할당
     assignCodeToMarker(pendingMarkerData);
 
     markers.push(pendingMarkerData);
@@ -1484,7 +1509,7 @@ function saveEditInfo() {
     editingMarker.d3 = document.getElementById("editDiv3").value;
     editingMarker.d4 = document.getElementById("editDiv4").value || "-";
 
-    // 구분1 또는 구분2가 변경되었다면 전체 코드 재계산
+    // 구분1 또는 구분2가 변경되었다면 전체 코드(및 사진 이름) 재계산
     if (oldD1 !== editingMarker.d1 || oldD2 !== editingMarker.d2) {
         recalculateAllCodes();
     }
