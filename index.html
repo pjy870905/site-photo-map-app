@@ -1305,7 +1305,9 @@ function renderInfoStep() {
     if(currentInfoStep === 1) renderStepButtons(1, "div1Buttons");
     if(currentInfoStep === 2) renderStepButtons(2, "div2Buttons");
     if(currentInfoStep === 3) renderStepButtons(3, "div3Buttons");
-    if(currentInfoStep === 4) inpDiv4.focus();
+    if(currentInfoStep === 4) {
+        // inpDiv4.focus(); // 터치 시에만 키보드가 나오도록 자동 포커스 해제
+    }
 }
 
 function renderStepButtons(step, containerId) {
@@ -1481,6 +1483,9 @@ function closeEditInfo() {
 
 function saveEditInfo() {
     if (!editingMarker) return;
+
+    const oldD1 = editingMarker.d1;
+    const oldD2 = editingMarker.d2;
 
     editingMarker.d1 = document.getElementById("editDiv1").value;
     editingMarker.d2 = document.getElementById("editDiv2").value;
