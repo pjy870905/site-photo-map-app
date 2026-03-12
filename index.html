@@ -872,7 +872,10 @@ function saveState() {
 // 초기 로드 시 DB에서 복구
 window.addEventListener('DOMContentLoaded', async () => {
     const savedMarkers = await getFromDB('markers');
-    if (savedMarkers) markers = savedMarkers;
+    if (savedMarkers) {
+        markers = savedMarkers;
+        recalculateAllCodes(); // 무결성을 위해 초기 로드시 코드 재정렬
+    }
     
     const savedPhotoCount = await getFromDB('photoCount');
     if (savedPhotoCount) photoCount = savedPhotoCount;
@@ -1009,6 +1012,9 @@ async function resetAllData() {
     document.getElementById("pdfUpload").value = "";
     document.getElementById("zipUpload").value = "";
     document.getElementById("pageInfo").innerText = "0 / 0";
+    
+    recalculateAllCodes();
+    
     renderMarkers();
     renderTable();
 
@@ -1401,10 +1407,10 @@ function assignCodeToMarker(marker) {
     codeCounters[key]++;
 }
 
-// 전체 마커에 대해 CODE를 재계산 (수정이나 삭제 시 호출)
+// 전체 마커에 대해 CODE를 재계산 (수정이나 삭제 시 호출하여 무결성 유지)
 function recalculateAllCodes() {
     codeCounters = {};
-    // 번호순으로 정렬하여 일관된 코드 부여 (선택사항, 필요에 따라 조정 가능)
+    // 번호순으로 정렬하여 일관된 코드 부여 
     const sortedMarkers = markers.slice().sort((a, b) => a.number - b.number);
     
     sortedMarkers.forEach(m => {
@@ -1418,10 +1424,11 @@ function saveMarkerInfo() {
     // 마지막 4단계 텍스트 입력값 저장
     pendingMarkerData.d4 = inpDiv4.value;
     
-    // CODE 및 사진 파일명 할당
-    assignCodeToMarker(pendingMarkerData);
-
     markers.push(pendingMarkerData);
+    
+    // 마커가 추가되었으므로 전체 코드 재계산
+    recalculateAllCodes();
+
     renderMarkers();
     renderTable();
     saveState();
@@ -1475,18 +1482,13 @@ function closeEditInfo() {
 function saveEditInfo() {
     if (!editingMarker) return;
 
-    const oldD1 = editingMarker.d1;
-    const oldD2 = editingMarker.d2;
-
     editingMarker.d1 = document.getElementById("editDiv1").value;
     editingMarker.d2 = document.getElementById("editDiv2").value;
     editingMarker.d3 = document.getElementById("editDiv3").value;
     editingMarker.d4 = document.getElementById("editDiv4").value || "-";
 
-    // 구분1 또는 구분2가 변경되었다면 전체 코드(및 사진 이름) 재계산
-    if (oldD1 !== editingMarker.d1 || oldD2 !== editingMarker.d2) {
-        recalculateAllCodes();
-    }
+    // 내용이 수정되었으므로 전체 코드 무결성을 위해 재계산
+    recalculateAllCodes();
 
     renderTable();
     saveState();
@@ -1641,7 +1643,7 @@ async function finalizeZipImport() {
     }
     if (pendingImportedState.markers) {
         markers = pendingImportedState.markers;
-        recalculateAllCodes(); // 불러온 데이터에 대해 코드 재계산
+        recalculateAllCodes(); // 불러온 데이터에 대해 코드 재계산하여 무결성 확보
     }
     saveState(); // IndexedDB에 마커 상태 저장
 
